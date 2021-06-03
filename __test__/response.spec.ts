@@ -1,6 +1,7 @@
 import ChowChow from '../src';
 import ChowError, { ResponseValidationError } from '../src/error';
 import { ResponseMeta } from '../src/compiler';
+import CompiledOperation from '../src/compiler/CompiledOperation';
 
 const fixture = require('./fixtures/response.json');
 
@@ -168,6 +169,59 @@ describe('Response', () => {
     expect(() => {
       chowchow.validateResponseByOperationId('showPetById', responseMeta);
     }).toThrow();
+  });
+
+  it('reponse validation unknonwnerror', () => {
+    const responseMeta: ResponseMeta = {
+      status: 200,
+      header: {
+        'content-type': 'application/json',
+      },
+      body: [
+        {
+          id: 1,
+        },
+      ],
+    };
+    // @ts-ignore
+    const og = chowchow.identifyCompiledPath;
+    // @ts-ignore
+    chowchow.identifyCompiledPath = function () {
+      throw new Error('unknown');
+    };
+    expect(() => {
+      chowchow.validateResponseByPath('/pets/123', 'get', responseMeta);
+    }).toThrow();
+    expect(() => {
+      chowchow.validateResponseByOperationId('showPetById', responseMeta);
+    }).toThrow();
+    //@ts-ignore
+    chowchow.identifyCompiledPath = og;
+  });
+
+  it('unknown error validating by operation id', () => {
+    const responseMeta: ResponseMeta = {
+      status: 200,
+      header: {
+        'content-type': 'application/json',
+      },
+      body: [
+        {
+          id: 1,
+        },
+      ],
+    };
+    // @ts-ignore
+    const og = CompiledOperation.prototype.validateResponse;
+    // @ts-ignore
+    CompiledOperation.prototype.validateResponse = function () {
+      throw new Error('unknown');
+    };
+    expect(() => {
+      chowchow.validateResponseByOperationId('showPetById', responseMeta);
+    }).toThrow();
+    //@ts-ignore
+    CompiledOperation.prototype.validateResponse = og;
   });
 
   it('should fail if response code does not match any', () => {

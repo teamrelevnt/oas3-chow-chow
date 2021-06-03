@@ -1,4 +1,5 @@
 import ChowChow, { ChowOptions } from '../src';
+import CompiledOperation from '../src/compiler/CompiledOperation';
 import ChowError, { RequestValidationError } from '../src/error';
 const fixture = require('./fixtures/pet-store.json');
 
@@ -194,6 +195,98 @@ describe('Pet Store', () => {
         ).toBe(1);
       }
     });
+
+    test('It should fail validation by operationId and receive a single error if payload is invalid and ChowOptions not configured', () => {
+      chowchow = new ChowChow(fixture as any);
+
+      try {
+        chowchow.validateRequestByOperationId('createPets', {
+          body: {
+            name: 123,
+          },
+          header: {
+            'content-type': 'application/json',
+          },
+        });
+      } catch (e) {
+        expect(e).toBeDefined();
+        expect(e).toBeInstanceOf(ChowError);
+        const chowError: ChowError = e;
+        expect(chowError.toJSON().suggestions.length).toBe(1);
+        expect(
+          chowError.meta.rawErrors && chowError.meta.rawErrors.length
+        ).toBe(1);
+      }
+    });
+
+    test('Wrong operation id', () => {
+      chowchow = new ChowChow(fixture as any);
+
+      try {
+        chowchow.validateRequestByOperationId('createPetsFail', {
+          body: {
+            name: 123,
+          },
+          header: {
+            'content-type': 'application/json',
+          },
+        });
+      } catch (e) {
+        expect(e).toBeDefined();
+        expect(e).toBeInstanceOf(ChowError);
+        const chowError: ChowError = e;
+        expect(chowError.toJSON().suggestions.length).toBe(0);
+      }
+    });
+
+    test('Unknown error', () => {
+      chowchow = new ChowChow(fixture as any);
+      // @ts-ignore
+      const og = chowchow.identifyCompiledPath;
+      try {
+        //@ts-ignore
+        chowchow.identifyCompiledPath = function () {
+          throw new Error('Unknown');
+        };
+        chowchow.validateRequestByPath('/pets', 'post', {
+          body: {
+            name: 123,
+          },
+          header: {
+            'content-type': 'application/json',
+          },
+        });
+      } catch (e) {
+        // @ts-ignore
+        chowchow.identifyCompiledPath = og;
+        expect(e).toBeDefined();
+        expect(e).not.toBeInstanceOf(ChowError);
+      }
+    });
+    test('Unknown error by operation id', () => {
+      chowchow = new ChowChow(fixture as any);
+      // @ts-ignore
+      const og = CompiledOperation.prototype.validateRequest;
+      try {
+        //@ts-ignore
+        CompiledOperation.prototype.validateRequest = function () {
+          throw new Error('Unknown');
+        };
+        chowchow.validateRequestByOperationId('createPets', {
+          body: {
+            name: 123,
+          },
+          header: {
+            'content-type': 'application/json',
+          },
+        });
+      } catch (e) {
+        // @ts-ignore
+        CompiledOperation.prototype.validateRequest = og;
+        expect(e).toBeDefined();
+        expect(e).not.toBeInstanceOf(ChowError);
+      }
+    });
   });
 
   describe('RequestBody', () => {
@@ -314,6 +407,21 @@ describe('Pet Store', () => {
       expect(
         chowchow.getDefinedRequestBodyContentType('/pets', 'get')
       ).toMatchSnapshot();
+    });
+
+    test('Unknown error', () => {
+      let err;
+      const og = CompiledOperation.prototype.getDefinedRequestBodyContentType;
+      CompiledOperation.prototype.getDefinedRequestBodyContentType = function () {
+        throw new Error('Uknown');
+      };
+      try {
+        chowchow.getDefinedRequestBodyContentType('/pets', 'get');
+      } catch (e) {
+        err = e;
+      }
+      CompiledOperation.prototype.getDefinedRequestBodyContentType = og;
+      expect(err).toBeDefined();
     });
   });
 
